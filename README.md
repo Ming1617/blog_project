@@ -6,7 +6,8 @@
 
 后端 -  前后端分离 - django +python+mysql+flask
 
-API  -  xxxxx
+
+
 
 
 问："你在新项目中遇到哪些困难/具体负责的内容"
