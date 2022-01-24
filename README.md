@@ -23,7 +23,7 @@
 
 **1.后端环境**
 
-**Python 3.7.3  +  django 1.11.8  + mysql 5.5  +  Ubuntu19.04  +  vim**
+**Python  +  django  + mysql +  Ubuntu  +  vim**
 
 **2.通信协议**
 
