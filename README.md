@@ -6,6 +6,8 @@
 
 **部署：http://101.43.178.158/**
 
+**联系qq：1024411945**
+
 **1.后端环境**
 
 **Python3.6 + django2.2.12 + mysql8.0.26 + Ubuntu + vim+redis+nginx**
