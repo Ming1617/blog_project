@@ -5,8 +5,8 @@
 ![请求流程【分离】](image/请求流程【分离】.jpg)
 
 **1.后端环境**
-
-**Python3.6 + django2.2.12 + mysql8.0.26 + Ubuntu + vim+redis**
+**部署：http://101.43.178.158/**
+**Python3.6 + django2.2.12 + mysql8.0.26 + Ubuntu + vim+redis+nginx**
 
 **2.通信协议**
 
