@@ -574,3 +574,465 @@ class Message(models.Model):
     
 ```
 
+
+## 项目部署
+
+- 项目部署是指在软件开发完毕后，将开发机器上运行的开发板软件实际安装到服务器上进行长期运行
+- 部署要分以下几个步骤进行
+  1. 在安装机器上安装和配置同版本的数据库
+  1. django 项目迁移(在安装机器上配置与开发环境相同的python版本及依懒的包)
+  1. 用 uwsgi 替代`python3 manage.py runserver` 方法启动服务器
+  1. 配置 nginx 反向代理服务器
+  1. 用nginx 配置静态文件路径,解决静态路径问题
+
+1. 安装同版本的数据库
+
+   - 安装步骤略
+
+2. django 项目迁移
+
+   1. 安装python
+
+      - `$ sudo apt install python3`
+
+   2. 安装相同版本的包
+
+      - 导出当前模块数据包的信息:
+        - `$ pip3 freeze > package_list.txt`
+      - 导入到另一台新主机
+        - `$ pip3 install -r package_list.txt`
+
+   3. 将当前项目源代码复制到远程主机上(scp 命令)
+
+      - $ sudo scp -a 当前项目源代码 远程主机地址和文件夹
+
+      - ```
+        sudo scp -a /home/tarena/django/mysite1.zip root@88.77.66.55:/home/root/xxx
+        请输入root密码：
+        ```
+
+
+
+### WSGI Django工作环境部署
+
+- WSGI (Web Server Gateway Interface)Web服务器网关接口，是Python应用程序或框架和Web服务器之间的一种接口，被广泛使用
+- 它实现了WSGI协议、http等协议。Nginx中HttpUwsgiModule的作用是与uWSGI服务器进行交换。WSGI是一种Web服务器网关接口。
+
+### uWSGI 网关接口配置 (ubuntu 18.04 配置)
+
+- 使用 `python manage.py runserver` 通常只在开发和测试环境中使用。
+
+- 当开发结束后，完善的项目代码需要在一个高效稳定的环境中运行，这时可以使用uWSGI
+
+- uWSGI是WSGI的一种,它可以让Django、Flask等开发的web站点运行其中.
+
+- 安装uWSGI
+
+  - 在线安装 uwsgi
+
+    ```shell
+    $ sudo pip3 install uwsgi
+    ```
+
+  - 离线安装
+
+    1. 在线下载安装包: 
+
+       ```shell
+       $ pip3 download uwsgi
+       ```
+
+       - 下载后的文件为 `uwsgi-2.0.18.tar.gz`
+
+    2. 离线安装
+
+       ```shell
+       $ tar -xzvf uwsgi-2.0.18.tar.gz
+       $ cd uwsgi-2.0.18
+       $ sudo python3 setup.py install
+       ```
+
+- 配置uWSGI
+
+  - 添加配置文件 `项目文件夹/uwsgi.ini`
+
+    - 如: mysite1/uwsgi.ini
+
+    ```ini
+    [uwsgi]
+    # 套接字方式的 IP地址:端口号
+    # socket=127.0.0.1:8000
+    
+    
+    # Http通信方式的 IP地址:端口号
+    http=127.0.0.1:8000
+    # 项目当前工作目录
+    chdir=/home/tarena/.../my_project 这里需要换为项目文件夹的绝对路径
+    # 项目中wsgi.py文件的目录，相对于当前工作目录
+    wsgi-file=my_project/wsgi.py
+    # 进程个数
+    process=4
+    # 每个进程的线程个数
+    threads=2
+    # 服务的pid记录文件
+    pidfile=uwsgi.pid
+    # 服务的目志文件位置
+    daemonize=uwsgi.log
+    ```
+
+  - 修改settings.py将 DEBUG=True 改为DEBUG=False
+
+  - 修改settings.py 将　ALLOWED_HOSTS = [] 改为　ALLOWED_HOSTS = ['*']
+
+- uWSGI的运行管理
+
+  - 启动 uwsgi
+
+    ```shell
+    $ cd 项目文件夹
+    $ sudo uwsgi --ini 项目文件夹/uwsgi.ini
+    ```
+
+  - 停止 uwsgi
+
+    ```shell
+    $ cd 项目文件夹
+    $ sudo uwsgi --stop uwsgi.pid
+    ```
+
+  - 说明:
+
+    - 当uwsgi 启动后,当前django项目的程序已变成后台守护进程,在关闭当前终端时此进程也不会停止。
+
+- 测试:
+
+  - 在浏览器端输入<http://127.0.0.1:8000> 进行测试
+  - 注意，此时端口号为8000
+
+### nginx 反向代理配置
+
+- Nginx是轻量级的高性能Web服务器，提供了诸如HTTP代理和反向代理、负载均衡、缓存等一系列重要特性，在实践之中使用广泛。
+
+- C语言编写，执行效率高
+
+- nginx 作用
+
+  - 负载均衡， 多台服务器轮流处理请求
+  - 反向代理
+
+- 原理:
+
+- 客户端请求nginx,再由nginx 请求 uwsgi, 运行django下的python代码
+
+- ubuntu 下 nginx 安装
+  $ sudo apt install nginx
+
+- nginx 配置 
+
+  - 修改nginx 的配置文件 /etc/nginx/sites-available/default
+
+  ```
+  # 在server节点下添加新的location项，指向uwsgi的ip与端口。
+  server {
+      ...
+      location / {
+          uwsgi_pass 127.0.0.1:8000;  # 重定向到127.0.0.1的8000端口
+          include /etc/nginx/uwsgi_params; # 将所有的参数转到uwsgi下
+      }
+      ...
+  }
+  ```
+
+- nginx服务控制
+
+  ```shell
+  $ sudo /etc/init.d/nginx start|stop|restart|status
+  # 或
+  $ sudo service nginx start|stop|restart|status
+  ```
+
+  > 通过 start,stop,restart,status 可能实现nginx服务的启动、停止、重启、查扑克状态等操作
+
+- 修改uWSGI配置 
+
+  - 修改`项目文件夹/uwsgi.ini`下的Http通信方式改为socket通信方式,如:
+
+  ```ini
+  [uwsgi]
+  # 去掉如下
+  # http=127.0.0.1:8000
+  # 改为
+  socket=127.0.0.1:8000
+  ```
+
+  - 重启uWSGI服务
+
+  ```shell
+  $ sudo uwsgi --stop uwsgi.pid
+  $ sudo uwsgi --ini 项目文件夹/uwsgi.ini
+  ```
+
+- 测试:
+
+  - 在浏览器端输入<http://127.0.0.1> 进行测试
+  - 注意，此时端口号为80(nginx默认值)
+
+### nginx 配置静态文件路径
+
+- 解决静态路径问题
+
+  ```ini
+  # file : /etc/nginx/sites-available/default
+  # 新添加location /static 路由配置，重定向到指定的绝对路径
+  server {
+      ...
+      location /static {
+          # root static文件夹所在的绝对路径,如:
+          root /home/tarena/my_django_project; # 重定向/static请求的路径，这里改为你项目的文件夹
+      }
+      ...
+  }
+  ```
+
+- 修改配置文件后需要重新启动 nginx 服务
+
+### apt更换国内源
+
+```shell
+mv /etc/apt/sources.list /etc/apt/sourses.list.bak
+cd /etc/apt/
+vim sources.list
+
+#输入如下内容后保存退出
+
+deb http://mirrors.aliyun.com/ubuntu/ bionic main restricted universe multiverse
+deb http://mirrors.aliyun.com/ubuntu/ bionic-security main restricted universe multiverse
+deb http://mirrors.aliyun.com/ubuntu/ bionic-updates main restricted universe multiverse
+deb http://mirrors.aliyun.com/ubuntu/ bionic-proposed main restricted universe multiverse
+deb http://mirrors.aliyun.com/ubuntu/ bionic-backports main restricted universe multiverse
+deb-src http://mirrors.aliyun.com/ubuntu/ bionic main restricted universe multiverse
+deb-src http://mirrors.aliyun.com/ubuntu/ bionic-security main restricted universe multiverse
+deb-src http://mirrors.aliyun.com/ubuntu/ bionic-updates main restricted universe multiverse
+deb-src http://mirrors.aliyun.com/ubuntu/ bionic-proposed main restricted universe multiverse
+deb-src http://mirrors.aliyun.com/ubuntu/ bionic-backports main restricted universe multiverse
+
+
+最后执行 apt-get update 更新最新源
+
+```
+
+
+
+### 系统组件安装
+
+#### nginx 1.14.0 
+
+```shell
+sudo apt-get install nginx
+安装完毕后 执行 nginx -v 
+```
+
+#### mysql-server 5.7 安装
+
+```shell
+apt-cache madison mysql-server - 查看mysql在线安装版本
+sudo apt-get install mysql-server
+安装完毕后 查看 cat /etc/mysql/debian.cnf 
+根据文件中的用户名和密码进入mysql
+
+修改root用户密码
+1）更新密码和验证方式
+   update mysql.user set authentication_string=password('123456'),plugin="mysql_native_password"  where user='root' and Host ='localhost';
+2）刷新权限 
+   flush privileges;
+```
+
+#### redis 4.0.9 安装
+
+```shell
+1，下载安装包
+wget http://download.redis.io/releases/redis-4.0.9.tar.gz
+
+2，解压
+tar zxvf redis-4.0.9.tar.gz
+
+3,安装
+cd redis-4.0.9
+make
+make install
+
+4,修改配置文件
+cd redis-4.0.9
+vim redis.conf
+配置1 - 后台启动
+	daemonize  yes
+配置2 - 日志
+	logfile "/var/log/redis/redis.log"
+注意：日志路径需要提前创建 终端 mkdir /var/log/redis
+
+5，复制配置文件
+mkdir /etc/redis
+cp redis.conf /etc/redis/redis.conf
+	
+6，配置启动脚本
+cp redis-4.0.9/utils/redis_init_script   /etc/init.d/redis-server
+
+```
+
+### Python环境相关
+
+#### pip3安装
+
+**sudo apt-get install python3-pip**
+
+```shell
+mkdir ~/.pip
+vim ~/.pip/pip.conf
+# 然后将下面这两行复制进去
+[global]
+index-url = https://mirrors.aliyun.com/pypi/simple
+
+国内其他pip源
+
+    清华：https://pypi.tuna.tsinghua.edu.cn/simple
+    中国科技大学 https://pypi.mirrors.ustc.edu.cn/simple/
+    华中理工大学：http://pypi.hustunique.com/
+    山东理工大学：http://pypi.sdutlinux.org/
+    豆瓣：http://pypi.douban.com/simple/
+```
+
+#### 第三方py库安装
+
+```shell
+pip3 install django==2.2.12
+pip3 install django-cors-headers==3.0.2
+pip3 install django-redis==4.10.0
+pip3 install PyMySQL==0.9.3
+pip3 install celery==4.3.0
+pip3 install PyJWT==1.7.1
+pip3 install uWSGI==2.0.18
+pip3 install python-alipay-sdk==2.0.1
+pip3 install Pillow
+pip3 install gevent
+pip3 install psutil
+
+#mysqlclient安装
+sudo apt-get install default-libmysqlclient-dev
+pip3 install mysqlclient
+```
+
+
+
+### 前端部署
+
+前端html和静态文件直接交由 nginx 处理
+
+1）修改nginx启动 用户
+
+vim /etc/nginx/nginx.conf
+
+```shell
+user root;  #修改nginx启动用户
+```
+
+2）修改nginx 80的默认配置
+
+vim /etc/nginx/sites-enabled/default
+
+```shell
+root /root/blog_client/templates;   # 指定全局静态路径地址
+
+
+location /static {
+
+        root /root/blog_client;
+}
+
+
+location / {  # 路由设定
+ 		
+		rewrite ^/(\w+)$  /$1.html break;
+ 		rewrite ^/(\w+)/info$  /about.html break;
+ 		rewrite ^/(\w+)/change_info$  /change_info.html break;
+ 		rewrite ^/(\w+)/topic/release$  /release.html break;
+ 		rewrite ^/(\w+)/topics$  /list.html break;
+ 		rewrite ^/(\w+)/topics/detail/(\d+)$  /detail.html break;
+ 		try_files $uri $uri/ =404;
+ 	}
+```
+
+**注意：前端页面里的ajax 的url需要改为公网地址**
+
+
+
+### 后端部署
+
+​	1） 可先以python3 manage.py runserver  0.0.0.0:8000 进行测试，保证前端没问题后，配置后端服务
+
+​		注意：settings.py中 跨域白名单需开启，allowed_host需要开启，debug模式关闭
+
+​	2）uwsgi配置添加
+
+```shell
+[uwsgi]
+#http=0.0.0.0:8002
+socket=127.0.0.1:8002
+# 项目当前工作目录
+chdir=/root/ddblog
+# 项目中wsgi.py文件的目录,相对于当前工作目录
+wsgi-file=ddblog/wsgi.py
+# 进程个数
+process=1
+# 每个进程的线程个数
+threads=2
+#服务的pid记录文件
+pidfile=uwsgi.pid
+#服务的日志文件位置
+daemonize=uwsgi.log
+```
+
+​	启动uwsgi 
+
+进入到项目settings.py所在目录执行如下命令
+
+命令： uwsgi --ini uwsgi.ini
+
+​	3）nginx配置添加
+
+​	新建nginx日志目录 ddblog
+
+​	mkdir -p /var/log/ddblog/
+
+​	cd /etc/nginx/conf.d
+
+​    touch ddblog.conf
+
+```nginx
+server {
+        listen   8001;
+        server_name _;
+        access_log /var/log/ddblog/access.log;
+        error_log /var/log/ddblog/error.log;
+
+        location / {
+                include        uwsgi_params;
+                uwsgi_pass     127.0.0.1:8002;
+        }
+
+        location /static {
+               root /root/blog_static;
+        }
+    	location /media {
+    		  root /root/ddblog;
+   		}
+}
+```
+
+修改前端ajax中的url - 如下命令慎用
+
+ps -aux | grep uwsgi
+
+```shell
+sed -i "s/http:\/\/101.43.178.158:8001/http:\/\/101.43.178.158:800/g" `grep http://101.43.178.158 -rl templates`
+```
+
