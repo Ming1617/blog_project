@@ -26,6 +26,23 @@
 
 **返回结构如{ ' code ' ：200， ' data ' ：{}， ' error ' : ' xxx ' }**
 
+开发模式：企业主流-前后端分离
+
+主体功能：
+
+	1）用户功能
+
+	2）文章功能
+	
+	3）留言功能
+	
+	4）回复功能
+	
+	5）支付功能（v2）
+
+
+
+
 **1、创建Django项目为Mienblog**
 
 `django-admin startproject Mienblog`
